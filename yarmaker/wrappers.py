@@ -1,0 +1,150 @@
+from abc import abstractmethod
+from typing import List, Optional, Iterable
+
+from .types import String, Instruction, Wildcard, DEFAULT_WILDCARD
+
+
+class YaraEntity(object):
+    @abstractmethod
+    def build(self, **kwargs) -> str:
+        pass
+
+
+class YaraString(YaraEntity):
+    def __init__(self, data: str, modifiers: Optional[list] = None):
+        self.data: str = self.escape(data)
+        self.modifiers = modifiers if modifiers else list()
+
+    @staticmethod
+    def escape(string: str) -> str:
+        stripped = str(string).strip('\r\n')
+        escaped = repr(stripped)[1:-1]
+        return escaped.replace('"', '\\\"')
+
+    @classmethod
+    def from_object(cls, string: String):
+        modifiers = []
+        if string.bytes_per_char == 2:
+            modifiers.append('wide')
+
+        converted = str(string)
+        if converted.strip('\r\n') == converted:
+            modifiers.append('fullword')
+
+        return cls(converted, modifiers)
+
+    def build(self, **kwargs) -> str:
+        modifiers = ' '.join(self.modifiers)
+        result = f'"{self.data}"'
+        if modifiers:
+            result += f' {modifiers}'
+
+        return result
+
+    def __hash__(self) -> int:
+        return hash(self.data)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, YaraString):
+            raise TypeError()
+
+        return self.data == other.data
+
+    def __str__(self) -> str:
+        return self.data
+
+    def __repr__(self) -> str:
+        return f'<YaraString "{self.data}">'
+
+
+class YaraInstructions(YaraEntity):
+    def __init__(self, entities: Iterable[Instruction]):
+        self.entities: List[Instruction] = list(entities)
+
+    def build(
+            self,
+            show_comments: bool = True,
+            wildcard: Wildcard = DEFAULT_WILDCARD,
+            indent: int = 2,
+            oneliner: bool = False,
+            **kwargs) -> str:
+
+        if oneliner:
+            data = ' '.join(insn.escape(wildcard) for insn in self.entities)
+            return f'{{ {data} }}'
+
+        result = '{\n' if len(self.entities) > 1 else ''
+        for insn in self.entities:
+            result += ' ' * indent
+
+            data = insn.escape(wildcard)
+            if len(self.entities) == 1:
+                data = f'{{ {data} }}'
+
+            if show_comments:
+                result += f'{data:30} // {insn.comment()}'
+            else:
+                result += data
+            result += '\n'
+
+        result += '}' if len(self.entities) > 1 else ''
+        return result
+    
+    def __hash__(self) -> int:
+        return hash(tuple(map(str, self.entities)))
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, YaraInstructions):
+            raise TypeError()
+
+        return tuple(self.entities) == tuple(other.entities)
+
+    def __len__(self) -> int:
+        return len(self.entities)
+
+    def __str__(self) -> str:
+        mnemonics = [str(insn) for insn in self.entities]
+        return ''.join(mnemonics)
+
+    def __repr__(self) -> str:
+        data = ' '.join([insn.mnemonic for insn in self.entities])
+        return f'<YaraInstructions "{data}">'
+               
+
+class YaraBytes(YaraEntity):
+    def __init__(self, data: bytes):
+        self.data = bytes(data)
+
+    def build(self, indent: int = 2, oneliner: bool = False, **kwargs) -> str:
+
+        if oneliner or len(self.data) <= 16:
+            data = self.data.hex(' ').upper()
+            return f"{{ {data} }}" 
+
+        result = '{\n'
+        for i in range(0, len(self.data), 16):
+            data = self.data[i:i + 16].hex(' ').upper()
+            result += ' ' * indent
+            result += data
+            result += '\n'
+        result += '}'
+        return result
+
+    def __hash__(self) -> int:
+        return hash(self.data)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, YaraBytes):
+            raise TypeError()
+
+        return self.data == other.data
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __str__(self) -> str:
+        return self.data.hex(' ')
+
+    def __repr__(self) -> str:
+        data = self.data[:10].hex(' ')
+        return f'<YaraBytes "{data}">'
