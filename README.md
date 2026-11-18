@@ -42,23 +42,11 @@ Key bindings can be changed in **Edit > Preferences > Keybindings** (search "Yar
 | Registers | ModRM and SIB bytes (only when the instruction has register / memory operands) |
 | Constants | immediate values |
 
-Binary Ninja does not expose where operand data is stored inside an
-instruction encoding, so YarMaker decodes the x86 instruction layout itself
-([yarmaker/x86.py](yarmaker/x86.py): prefixes, REX, VEX, EVEX, XOP, 3DNow!,
-ModRM, SIB, displacement and immediate sizes). Binary Ninja's disassembly is
-still used for the instruction boundaries, the operand tokens and the comments;
-if the decoded length ever disagrees with Binary Ninja the instruction falls
-back to the behavior below.
-
-Other architectures have no byte level operand information: with the
-**Offsets** mask, instructions that Binary Ninja's
-[WARP](https://docs.binary.ninja/dev/annotation.html) analysis reports as
-*variant* (location dependent: calls, branches, address references) are
-wildcarded entirely (Binary Ninja 5.0+). Other masks are x86-only, like in the
-IDA version.
-
 ### Installation
 
+Use the Extension Manager to install the plugin.
+
+**OR**
 Copy this folder into your Binary Ninja user plugins directory
 (**Plugins > Open Plugin Folder...**):
 - **Windows**: `%APPDATA%\Binary Ninja\plugins\`
@@ -119,7 +107,5 @@ DEFAULT_CONDITIONS = [
 
 ### License
 YarMaker is licensed under the [GNU General Public License v3.0](LICENSE).
-
-This project is a port of my IDA plugin [yarmaker](https://github.com/cod3nym/yarmaker) for Binary Ninja.
 
 - Copyright (C) 2026 Jonathan Peters
